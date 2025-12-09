@@ -322,7 +322,25 @@ module.exports = async (req, res) => {
 
     // Save booking with cancellation token
     const bookingKey = `booking:${cancellationToken}`;
-    await storage.set(bookingKey, bookingData);
+    
+    console.log('Saving booking with key:', bookingKey);
+    console.log('Storage type:', process.env.UPSTASH_REDIS_REST_URL ? 'Upstash Redis' : process.env.KV_REST_API_URL ? 'Vercel KV' : 'In-memory (WARNING: Not persistent!)');
+    
+    try {
+      await storage.set(bookingKey, bookingData);
+      console.log('Booking saved successfully');
+      
+      // Verify it was saved
+      const verifyBooking = await storage.get(bookingKey);
+      if (!verifyBooking) {
+        console.error('WARNING: Booking was not saved correctly!');
+      } else {
+        console.log('Booking verified in storage');
+      }
+    } catch (error) {
+      console.error('Error saving booking:', error);
+      // Don't fail the request, but log the error
+    }
 
     // Add to date-based index for availability checking
     existingBookings.push({
@@ -331,7 +349,13 @@ module.exports = async (req, res) => {
       email,
       name: `${firstName} ${lastName}`
     });
-    await storage.set(bookingsKey, existingBookings);
+    
+    try {
+      await storage.set(bookingsKey, existingBookings);
+      console.log('Date index updated successfully');
+    } catch (error) {
+      console.error('Error updating date index:', error);
+    }
 
     // Success response (include confirmation link for workaround)
     const response = { 

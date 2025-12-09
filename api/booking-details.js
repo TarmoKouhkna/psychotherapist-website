@@ -86,9 +86,27 @@ module.exports = async (req, res) => {
 
     const storage = await getStorage();
     const bookingKey = `booking:${token}`;
-    const booking = await storage.get(bookingKey);
+    
+    console.log('Looking for booking with key:', bookingKey);
+    console.log('Storage type:', process.env.UPSTASH_REDIS_REST_URL ? 'Upstash Redis' : process.env.KV_REST_API_URL ? 'Vercel KV' : 'In-memory');
+    
+    let booking;
+    try {
+      booking = await storage.get(bookingKey);
+      console.log('Booking found:', !!booking);
+      if (booking) {
+        console.log('Booking data keys:', Object.keys(booking));
+      }
+    } catch (error) {
+      console.error('Error retrieving booking:', error);
+      return res.status(500).json({
+        error: 'Storage error',
+        message: 'Broneeringu andmete laadimisel tekkis viga.'
+      });
+    }
 
     if (!booking) {
+      console.log('Booking not found for token:', token.substring(0, 10) + '...');
       return res.status(404).json({ 
         error: 'Booking not found',
         message: 'Broneeringut ei leitud. Link võib olla aegunud või vigane.'
