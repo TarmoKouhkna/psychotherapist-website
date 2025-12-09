@@ -18,6 +18,7 @@ function formatConsultationType(type) {
 // Initialize Resend
 if (!process.env.RESEND_API_KEY) {
   console.error('ERROR: RESEND_API_KEY is not set in environment variables');
+  throw new Error('RESEND_API_KEY environment variable is not configured');
 }
 const resend = new Resend(process.env.RESEND_API_KEY);
 
