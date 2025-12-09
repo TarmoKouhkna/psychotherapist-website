@@ -5,9 +5,11 @@
 Create a `.env` file in the `server/` directory with the following:
 
 ```
-RESEND_API_KEY=re_agprYJ5H_Mn3ey76HXGJy97pufPJUojy4
+RESEND_API_KEY=your_resend_api_key_here
 PORT=3001
 ```
+
+**Note:** For production on Vercel, set `RESEND_API_KEY` in the Vercel project settings under Environment Variables.
 
 ## Running the Server
 
@@ -57,4 +59,5 @@ Handles consultation form submissions and sends emails via Resend API.
 ### GET /api/health
 
 Health check endpoint to verify server is running.
+
 
