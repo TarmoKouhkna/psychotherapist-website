@@ -156,9 +156,10 @@ module.exports = async (req, res) => {
     // Generate unique cancellation token
     const cancellationToken = crypto.randomBytes(32).toString('hex');
     
-    // Get base URL for cancellation links
+    // Get base URL for links
     const baseUrl = req.headers.origin || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     const cancelUrl = `${baseUrl}/cancel?token=${cancellationToken}`;
+    const confirmUrl = `${baseUrl}/confirm?token=${cancellationToken}`;
 
     // Format the date for display (Estonian format)
     const formattedDate = new Date(preferredDate).toLocaleDateString('et-EE', {
@@ -197,6 +198,14 @@ module.exports = async (req, res) => {
         <p style="margin-top: 30px; color: #78716c; font-size: 12px;">
           Kui soovite seda broneeringut tühistada, kasutage ülalolevat linki.
         </p>
+        <div style="margin-top: 20px; padding: 15px; background-color: #f0f9ff; border-left: 4px solid #0ea5e9; border-radius: 4px;">
+          <p style="margin: 0; color: #0c4a6e; font-size: 14px;">
+            <strong>Märkus:</strong> Kuna me ei saa praegu kliendile otse e-kirju saata, palun jagage kliendiga järgmist kinnituse linki:
+          </p>
+          <p style="margin: 10px 0 0 0; word-break: break-all;">
+            <a href="${confirmUrl}" style="color: #0ea5e9; text-decoration: underline;">${confirmUrl}</a>
+          </p>
+        </div>
       </div>
     `;
 
@@ -324,11 +333,12 @@ module.exports = async (req, res) => {
     });
     await storage.set(bookingsKey, existingBookings);
 
-    // Success response (include email status for debugging)
+    // Success response (include confirmation link for workaround)
     const response = { 
       success: true,
       message: 'Broneering on edukalt kinnitatud!',
-      bookingId: cancellationToken
+      bookingId: cancellationToken,
+      confirmationLink: confirmUrl  // Include confirmation link for workaround
     };
     
     // Add email status if there were issues
@@ -339,7 +349,7 @@ module.exports = async (req, res) => {
       } else if (!emailStatus.therapistSent) {
         response.message += ' Märkus: Terapeudile e-kiri ei saadetud.';
       } else if (!emailStatus.userSent) {
-        response.message += ' Märkus: Klientidele e-kirjade saatmiseks kinnitage oma domeen Resend-is.';
+        response.message += ' Märkus: Klientidele e-kirjade saatmiseks kinnitage oma domeen Resend-is. Kinnituse link on saadud terapeudile.';
       }
     } else {
       response.message += ' Kontrollige oma e-posti kinnituse jaoks.';

@@ -38,6 +38,18 @@
   - **Cancellation System**: Both parties can cancel appointments via email links
   - **Booking Storage**: Appointments are stored and managed automatically
 
+  ## Email Setup (Important!)
+
+  **Current Status:** The system uses `onboarding@resend.dev` which only sends to verified emails (like your therapist email).
+
+  **To send emails to all users:**
+  1. Go to [https://resend.com/domains](https://resend.com/domains)
+  2. Add and verify your domain (e.g., `yourdomain.com`)
+  3. Update the `fromEmail` in `api/book-consultation.js` to use your verified domain (e.g., `noreply@yourdomain.com`)
+  4. Redeploy
+
+  Until domain verification, only the therapist will receive emails.
+
   ## Storage Setup (Production)
 
   For production, you need persistent storage. The easiest way is to use **Upstash Redis** (free tier available):
