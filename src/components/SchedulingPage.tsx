@@ -2,7 +2,17 @@ import { useState, useEffect } from "react";
 import { Calendar, Clock, User, Mail, Phone, MessageSquare, ArrowLeft, Loader2, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use Vercel API routes in production, localhost in development
+const getApiUrl = () => {
+  if (import.meta.env.PROD) {
+    // In production on Vercel, use relative paths
+    return '';
+  }
+  // In development, use localhost or custom URL
+  return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+};
+
+const API_URL = getApiUrl();
 const CALENDLY_LINK = 'https://calendly.com/tarmokouhkna/30min';
 
 export function SchedulingPage() {
@@ -43,7 +53,10 @@ export function SchedulingPage() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/book-consultation`, {
+      const apiEndpoint = `${API_URL}/api/book-consultation`;
+      console.log('Submitting to:', apiEndpoint);
+      
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -51,17 +64,21 @@ export function SchedulingPage() {
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.message || 'Konsultatsioonitaotluse esitamine ebaõnnestus');
+        const errorData = await response.json().catch(() => ({ message: 'Server error' }));
+        throw new Error(errorData.message || `Server error: ${response.status}`);
       }
 
+      const data = await response.json();
       setSubmitted(true);
       setRedirectCountdown(3);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Tekkis ootamatu viga. Palun proovige uuesti.');
       console.error('Submission error:', err);
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Ühenduse viga. Palun kontrollige oma internetiühendust ja proovige uuesti.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Tekkis ootamatu viga. Palun proovige uuesti.');
+      }
     } finally {
       setLoading(false);
     }
