@@ -19,9 +19,20 @@ module.exports = async (req, res) => {
 
   res.json({ 
     status: 'ok', 
-    message: 'Server is running',
+    message: 'Server töötab',
     hasApiKey: !!process.env.RESEND_API_KEY,
-    apiKeyPrefix: process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.substring(0, 10) + '...' : 'not set'
+    apiKeyPrefix: process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.substring(0, 10) + '...' : 'pole määratud',
+    // Check for storage environment variables
+    hasUpstashUrl: !!process.env.UPSTASH_REDIS_REST_URL,
+    hasUpstashToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+    hasKvRestUrl: !!process.env.KV_REST_API_URL,
+    hasKvRestToken: !!process.env.KV_REST_API_TOKEN,
+    // Storage status
+    storage: (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+      ? 'Upstash Redis (persistent) ✅'
+      : (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+        ? 'Vercel KV (persistent) ✅'
+        : 'In-memory (temporary - bookings lost on restart) ⚠️'
   });
 };
 

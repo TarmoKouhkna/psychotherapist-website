@@ -32,8 +32,27 @@
 
   ## Features
 
-  - Meeting booking form with email notifications via Resend API
-  - Automatic email confirmation to users with Calendly link
-  - Notification emails to therapist with booking details
-  - Integration with Calendly for appointment scheduling
+  - **Custom Booking System**: Real-time availability checking
+  - **Dynamic Time Slots**: Only available times are shown based on selected date
+  - **Email Notifications**: Automatic emails to both user and therapist via Resend API
+  - **Cancellation System**: Both parties can cancel appointments via email links
+  - **Booking Storage**: Appointments are stored and managed automatically
+
+  ## Storage Setup (Production)
+
+  For production, you need persistent storage. The easiest way is to use **Upstash Redis** (free tier available):
+
+  ### Option 1: Upstash Redis (Recommended - Free Tier Available)
+
+  1. Go to [https://upstash.com](https://upstash.com) and sign up (free)
+  2. Create a new Redis database
+  3. Copy the **REST API URL** and **REST API Token**
+  4. In Vercel Dashboard → Your Project → Settings → Environment Variables, add:
+     - `UPSTASH_REDIS_REST_URL` = (your REST API URL)
+     - `UPSTASH_REDIS_REST_TOKEN` = (your REST API Token)
+  5. Redeploy your project
+
+  ### Option 2: Use In-Memory Storage (Development Only)
+
+  Without Redis, the system uses in-memory storage. **Bookings will be lost when the server restarts**, so this is only suitable for testing.
   

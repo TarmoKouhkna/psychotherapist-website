@@ -1,7 +1,62 @@
 const { Resend } = require('resend');
+const crypto = require('crypto');
 
-const CALENDLY_LINK = 'https://calendly.com/tarmokouhkna/30min';
 const THERAPIST_EMAIL = 'tarmokouhkna@gmail.com';
+
+// Helper to get storage (Upstash Redis, Vercel KV, or fallback)
+async function getStorage() {
+  // Try Upstash Redis first (recommended for Vercel)
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    try {
+      const { Redis } = require('@upstash/redis');
+      const redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      });
+      return {
+        get: async (key) => {
+          const data = await redis.get(key);
+          return data ? JSON.parse(data) : null;
+        },
+        set: async (key, value) => {
+          await redis.set(key, JSON.stringify(value));
+        },
+        del: async (key) => {
+          await redis.del(key);
+        }
+      };
+    } catch (e) {
+      console.warn('Upstash Redis not available:', e.message);
+    }
+  }
+  
+  // Try Vercel KV (legacy, if still available)
+  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    try {
+      const { kv } = require('@vercel/kv');
+      return kv;
+    } catch (e) {
+      console.warn('Vercel KV not available, using fallback storage');
+    }
+  }
+  
+  // Fallback to in-memory (for development)
+  if (!global.bookingsStorage) {
+    global.bookingsStorage = {};
+  }
+  return {
+    get: async (key) => {
+      const data = global.bookingsStorage[key];
+      return data ? JSON.parse(data) : null;
+    },
+    set: async (key, value) => {
+      global.bookingsStorage[key] = JSON.stringify(value);
+    },
+    del: async (key) => {
+      delete global.bookingsStorage[key];
+    }
+  };
+}
 
 // Helper function to format consultation type
 function formatConsultationType(type) {
@@ -63,6 +118,46 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Normalize time format (handle both "09:00" and "9:00 AM" formats)
+    const normalizeTime = (time) => {
+      // Remove AM/PM and convert to HH:MM format
+      let normalized = time.replace(/\s*(AM|PM)/i, '').trim();
+      if (time.includes('PM') && !time.includes('12:')) {
+        const [hours, minutes] = normalized.split(':');
+        normalized = `${parseInt(hours) + 12}:${minutes}`;
+      }
+      // Ensure two-digit format
+      const [hours, minutes] = normalized.split(':');
+      return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+    };
+    
+    const normalizedTime = normalizeTime(preferredTime);
+
+    // Check if the time slot is still available
+    const storage = await getStorage();
+    const bookingsKey = `bookings:${preferredDate}`;
+    const existingBookings = await storage.get(bookingsKey) || [];
+    
+    // Check if this time slot is already booked
+    const isBooked = existingBookings.some(booking => {
+      const bookingTime = normalizeTime(booking.time);
+      return bookingTime === normalizedTime;
+    });
+    
+    if (isBooked) {
+      return res.status(409).json({ 
+        error: 'Aeg on juba broneeritud',
+        message: 'Valitud aeg on juba broneeritud. Palun valige teine aeg.'
+      });
+    }
+
+    // Generate unique cancellation token
+    const cancellationToken = crypto.randomBytes(32).toString('hex');
+    
+    // Get base URL for cancellation links
+    const baseUrl = req.headers.origin || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    const cancelUrl = `${baseUrl}/cancel?token=${cancellationToken}`;
+
     // Format the date for display (Estonian format)
     const formattedDate = new Date(preferredDate).toLocaleDateString('et-EE', {
       weekday: 'long',
@@ -87,12 +182,18 @@ module.exports = async (req, res) => {
         <div style="background-color: #f0fdfa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="color: #0d9488; margin-top: 0;">Kohtumise üksikasjad</h3>
           <p><strong>Eelistatud kuupäev:</strong> ${formattedDate}</p>
-          <p><strong>Eelistatud kellaaeg:</strong> ${preferredTime}</p>
+          <p><strong>Eelistatud kellaaeg:</strong> ${normalizedTime}</p>
           <p><strong>Konsultatsiooni tüüp:</strong> ${formattedConsultationType}</p>
           ${message ? `<p><strong>Lisainfo:</strong><br>${message}</p>` : ''}
         </div>
-        <p style="margin-top: 30px; color: #78716c;">
-          Palun võtke kliendiga ühendust, et kinnitada kohtumine, või kasutage oma Calendly linki broneerimiseks.
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${cancelUrl}" 
+             style="background-color: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
+            Tühista broneering
+          </a>
+        </div>
+        <p style="margin-top: 30px; color: #78716c; font-size: 12px;">
+          Kui soovite seda broneeringut tühistada, kasutage ülalolevat linki.
         </p>
       </div>
     `;
@@ -106,23 +207,20 @@ module.exports = async (req, res) => {
         <div style="background-color: #f0fdfa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="color: #0d9488; margin-top: 0;">Teie taotluse kokkuvõte</h3>
           <p><strong>Eelistatud kuupäev:</strong> ${formattedDate}</p>
-          <p><strong>Eelistatud kellaaeg:</strong> ${preferredTime}</p>
+          <p><strong>Eelistatud kellaaeg:</strong> ${normalizedTime}</p>
           <p><strong>Konsultatsiooni tüüp:</strong> ${formattedConsultationType}</p>
         </div>
+        <p style="margin-top: 30px; color: #78716c;">
+          Teie broneering on kinnitatud. Ootan koostööd teiega.
+        </p>
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${CALENDLY_LINK}" 
-             style="background-color: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
-            Broneeri oma kohtumine Calendly-s
+          <a href="${cancelUrl}" 
+             style="background-color: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
+            Tühista broneering
           </a>
         </div>
-        <p style="margin-top: 30px;">
-          Saate kasutada ka allolevat linki, et broneerida oma kohtumine otse:
-        </p>
-        <p style="word-break: break-all; color: #0d9488;">
-          <a href="${CALENDLY_LINK}" style="color: #0d9488;">${CALENDLY_LINK}</a>
-        </p>
-        <p style="margin-top: 30px; color: #78716c;">
-          Vaatan teie taotlust üle ja võtan teiega 24 tunni jooksul ühendust, et kinnitada teie kohtumine. Kui teil on küsimusi või peate muudatusi tegema, ärge kartke ühendust võtta.
+        <p style="margin-top: 20px; color: #78716c; font-size: 12px;">
+          Kui teil on küsimusi või peate broneeringut muutma, kasutage ülalolevat tühistamise linki.
         </p>
         <p style="margin-top: 20px;">
           Parimate soovidega,<br>
@@ -183,11 +281,38 @@ module.exports = async (req, res) => {
       console.warn('To send emails to clients, verify your domain at https://resend.com/domains');
     }
 
+    // Store the booking
+    const bookingData = {
+      token: cancellationToken,
+      date: preferredDate,
+      time: normalizedTime, // Store normalized time
+      firstName,
+      lastName,
+      email,
+      phone,
+      consultationType: formattedConsultationType,
+      message,
+      createdAt: new Date().toISOString()
+    };
+
+    // Save booking with cancellation token
+    const bookingKey = `booking:${cancellationToken}`;
+    await storage.set(bookingKey, bookingData);
+
+    // Add to date-based index for availability checking
+    existingBookings.push({
+      token: cancellationToken,
+      time: normalizedTime, // Store normalized time
+      email,
+      name: `${firstName} ${lastName}`
+    });
+    await storage.set(bookingsKey, existingBookings);
+
     // Success response
     res.status(200).json({ 
       success: true,
-      message: 'Konsultatsioonitaotlus edukalt esitatud. Kontrollige oma e-posti kinnituse jaoks.',
-      calendlyLink: CALENDLY_LINK
+      message: 'Broneering on edukalt kinnitatud! Kontrollige oma e-posti kinnituse jaoks.',
+      bookingId: cancellationToken
     });
 
   } catch (error) {

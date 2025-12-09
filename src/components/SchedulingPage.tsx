@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Calendar, Clock, User, Mail, Phone, MessageSquare, ArrowLeft, Loader2, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { Calendar, Clock, User, Mail, Phone, MessageSquare, ArrowLeft, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 // Use Vercel API routes in production, localhost in development
@@ -13,7 +13,6 @@ const getApiUrl = () => {
 };
 
 const API_URL = getApiUrl();
-const CALENDLY_LINK = 'https://calendly.com/tarmokouhkna/30min';
 
 export function SchedulingPage() {
   const navigate = useNavigate();
@@ -31,21 +30,8 @@ export function SchedulingPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
-
-  // Auto-redirect to Calendly after 3 seconds
-  useEffect(() => {
-    if (submitted && redirectCountdown !== null) {
-      if (redirectCountdown > 0) {
-        const timer = setTimeout(() => {
-          setRedirectCountdown(redirectCountdown - 1);
-        }, 1000);
-        return () => clearTimeout(timer);
-      } else {
-        window.location.href = CALENDLY_LINK;
-      }
-    }
-  }, [submitted, redirectCountdown]);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +57,6 @@ export function SchedulingPage() {
 
       const data = await response.json();
       setSubmitted(true);
-      setRedirectCountdown(3);
     } catch (err) {
       console.error('Submission error:', err);
       if (err instanceof TypeError && err.message.includes('fetch')) {
@@ -85,10 +70,45 @@ export function SchedulingPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const newValue = e.target.value;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [e.target.name]: newValue,
     });
+
+    // If date changed, fetch available times for that date
+    if (e.target.name === 'preferredDate' && newValue) {
+      fetchAvailableTimes(newValue);
+    } else if (e.target.name === 'preferredDate' && !newValue) {
+      // Clear times if date is cleared
+      setAvailableTimes([]);
+      setFormData(prev => ({ ...prev, preferredTime: '' }));
+    }
+  };
+
+  // Fetch available time slots for selected date
+  const fetchAvailableTimes = async (date: string) => {
+    setLoadingTimes(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/availability?date=${date}`);
+      if (!response.ok) {
+        throw new Error('Vaba aegade laadimine ebaõnnestus');
+      }
+      const data = await response.json();
+      setAvailableTimes(data.availableSlots || []);
+      
+      // If current selected time is not available, clear it
+      if (formData.preferredTime && !data.availableSlots.includes(formData.preferredTime)) {
+        setFormData(prev => ({ ...prev, preferredTime: '' }));
+      }
+    } catch (err) {
+      console.error('Error fetching available times:', err);
+      setError('Vaba aegade kontrollimisel tekkis viga. Palun proovige uuesti.');
+      setAvailableTimes([]);
+    } finally {
+      setLoadingTimes(false);
+    }
   };
 
   if (submitted) {
@@ -100,26 +120,12 @@ export function SchedulingPage() {
           </div>
           <h2 className="text-stone-900 mb-4">Täname!</h2>
           <p className="text-stone-600 mb-6">
-            Teie konsultatsioonitaotlus on vastu võetud. Kontrollige oma e-posti kinnituse üksikasjade jaoks.
-            {redirectCountdown !== null && redirectCountdown > 0 && (
-              <span className="block mt-2 text-sm">
-                Suunamine Calendly-sse {redirectCountdown} sekundi{redirectCountdown !== 1 ? '' : ''} pärast...
-              </span>
-            )}
+            Teie broneering on edukalt kinnitatud! Kontrollige oma e-posti kinnituse üksikasjade jaoks.
           </p>
           <div className="space-y-3">
-            <a
-              href={CALENDLY_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block bg-teal-700 text-white px-6 py-3 rounded-lg hover:bg-teal-800 transition-colors flex items-center justify-center gap-2"
-            >
-              Broneeri Calendly-s
-              <ExternalLink className="w-4 h-4" />
-            </a>
             <button
               onClick={() => navigate("/")}
-              className="w-full bg-stone-200 text-stone-700 px-6 py-3 rounded-lg hover:bg-stone-300 transition-colors"
+              className="w-full bg-teal-700 text-white px-6 py-3 rounded-lg hover:bg-teal-800 transition-colors"
             >
               Tagasi avalehele
             </button>
@@ -246,6 +252,9 @@ export function SchedulingPage() {
                 <label htmlFor="preferredTime" className="block text-stone-900 mb-2">
                   <Clock className="w-4 h-4 inline mr-2" />
                   Eelistatud kellaaeg *
+                  {loadingTimes && (
+                    <span className="ml-2 text-sm text-stone-500">(laadimine...)</span>
+                  )}
                 </label>
                 <select
                   id="preferredTime"
@@ -253,19 +262,29 @@ export function SchedulingPage() {
                   required
                   value={formData.preferredTime}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-700"
+                  disabled={!formData.preferredDate || loadingTimes || availableTimes.length === 0}
+                  className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-700 disabled:bg-stone-100 disabled:cursor-not-allowed"
                 >
-                  <option value="">Vali kellaaeg</option>
-                  <option value="9:00 AM">9:00</option>
-                  <option value="10:00 AM">10:00</option>
-                  <option value="11:00 AM">11:00</option>
-                  <option value="12:00 PM">12:00</option>
-                  <option value="1:00 PM">13:00</option>
-                  <option value="2:00 PM">14:00</option>
-                  <option value="3:00 PM">15:00</option>
-                  <option value="4:00 PM">16:00</option>
-                  <option value="5:00 PM">17:00</option>
+                  <option value="">
+                    {!formData.preferredDate 
+                      ? 'Valige esmalt kuupäev' 
+                      : loadingTimes 
+                        ? 'Laadimine...' 
+                        : availableTimes.length === 0 
+                          ? 'Vabu aegu pole saadaval' 
+                          : 'Vali kellaaeg'}
+                  </option>
+                  {availableTimes.map((time) => (
+                    <option key={time} value={time}>
+                      {time}
+                    </option>
+                  ))}
                 </select>
+                {formData.preferredDate && !loadingTimes && availableTimes.length === 0 && (
+                  <p className="mt-2 text-sm text-red-600">
+                    Sellel kuupäeval pole vabu aegu saadaval. Palun valige teine kuupäev.
+                  </p>
+                )}
               </div>
             </div>
 
