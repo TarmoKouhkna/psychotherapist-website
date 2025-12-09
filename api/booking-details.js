@@ -12,14 +12,42 @@ async function getStorage() {
       });
       return {
         get: async (key) => {
-          const data = await redis.get(key);
-          return data ? JSON.parse(data) : null;
+          try {
+            const data = await redis.get(key);
+            if (data === null || data === undefined) {
+              return null;
+            }
+            // Upstash Redis may return the data as-is or as a string
+            if (typeof data === 'string') {
+              try {
+                return JSON.parse(data);
+              } catch (e) {
+                return data;
+              }
+            }
+            // If it's already an object, return it
+            return data;
+          } catch (error) {
+            console.error('Redis get error for key', key, ':', error);
+            return null;
+          }
         },
         set: async (key, value) => {
-          await redis.set(key, JSON.stringify(value));
+          try {
+            // Always stringify to ensure consistency
+            await redis.set(key, JSON.stringify(value));
+          } catch (error) {
+            console.error('Redis set error for key', key, ':', error);
+            throw error;
+          }
         },
         del: async (key) => {
-          await redis.del(key);
+          try {
+            await redis.del(key);
+          } catch (error) {
+            console.error('Redis del error for key', key, ':', error);
+            throw error;
+          }
         }
       };
     } catch (e) {
