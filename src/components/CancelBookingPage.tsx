@@ -155,7 +155,7 @@ export function CancelBookingPage() {
           >
             Tagasi
           </button>
-        </div>
+        </main>
       </div>
     </div>
   );
