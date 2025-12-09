@@ -368,7 +368,7 @@ export function SchedulingPage() {
             helistage kohe 112 või enesetapu ennetamise telefonile 655 8088.
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
