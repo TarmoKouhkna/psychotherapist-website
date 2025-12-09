@@ -114,7 +114,7 @@ export function SchedulingPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg text-center">
+        <main className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg text-center">
           <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Calendar className="w-8 h-8 text-teal-700" />
           </div>
@@ -130,14 +130,14 @@ export function SchedulingPage() {
               Tagasi avalehele
             </button>
           </div>
-        </div>
+        </main>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <button
           onClick={() => navigate("/")}
           className="flex items-center gap-2 text-teal-700 hover:text-teal-800 mb-8 transition-colors"

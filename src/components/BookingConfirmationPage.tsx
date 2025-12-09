@@ -61,10 +61,10 @@ export function BookingConfirmationPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white flex items-center justify-center px-4">
-        <div className="max-w-2xl w-full bg-white p-8 rounded-lg shadow-lg text-center">
+        <main className="max-w-2xl w-full bg-white p-8 rounded-lg shadow-lg text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-700 mx-auto mb-4"></div>
           <p className="text-stone-600">Laadimine...</p>
-        </div>
+        </main>
       </div>
     );
   }
@@ -72,7 +72,7 @@ export function BookingConfirmationPage() {
   if (error || !booking) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg text-center">
+        <main className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg text-center">
           <h2 className="text-stone-900 mb-4">Viga</h2>
           <p className="text-stone-600 mb-6">{error || 'Broneeringut ei leitud.'}</p>
           <button
@@ -81,7 +81,7 @@ export function BookingConfirmationPage() {
           >
             Tagasi avalehele
           </button>
-        </div>
+        </main>
       </div>
     );
   }
@@ -95,7 +95,7 @@ export function BookingConfirmationPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white flex items-center justify-center px-4 py-12">
-      <div className="max-w-2xl w-full bg-white p-8 rounded-lg shadow-lg">
+      <main className="max-w-2xl w-full bg-white p-8 rounded-lg shadow-lg">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-700" />
@@ -187,7 +187,7 @@ export function BookingConfirmationPage() {
             <Home className="w-5 h-5" />
             Tagasi avalehele
           </button>
-        </div>
+        </main>
       </div>
     </div>
   );

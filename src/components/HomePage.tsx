@@ -9,10 +9,12 @@ export function HomePage() {
   return (
     <div className="min-h-screen bg-stone-50">
       <Navigation />
-      <Hero />
-      <About />
-      <Services />
-      <Contact />
+      <main>
+        <Hero />
+        <About />
+        <Services />
+        <Contact />
+      </main>
       <Footer />
     </div>
   );

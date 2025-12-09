@@ -91,7 +91,10 @@ export function Navigation() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="md:hidden bg-white border-t">
+        <div 
+          className="md:hidden bg-white border-t"
+          aria-hidden={!isOpen}
+        >
           <div className="px-2 pt-2 pb-3 space-y-1">
             <button
               onClick={() => scrollToSection("home")}
