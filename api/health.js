@@ -20,8 +20,9 @@ module.exports = async (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Server töötab',
-    hasApiKey: !!process.env.RESEND_API_KEY,
-    apiKeyPrefix: process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.substring(0, 10) + '...' : 'pole määratud',
+    hasResendApiKey: !!process.env.RESEND_API_KEY,
+    resendApiKeyPrefix: process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.substring(0, 10) + '...' : 'pole määratud',
+    resendStatus: process.env.RESEND_API_KEY ? 'configured ✅' : 'not configured ⚠️ - emails will not be sent',
     // Check for storage environment variables
     hasUpstashUrl: !!process.env.UPSTASH_REDIS_REST_URL,
     hasUpstashToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,

@@ -71,11 +71,13 @@ function formatConsultationType(type) {
 }
 
 // Initialize Resend
+let resend;
 if (!process.env.RESEND_API_KEY) {
   console.error('ERROR: RESEND_API_KEY is not set in environment variables');
-  throw new Error('RESEND_API_KEY environment variable is not configured');
+  console.error('Emails will not be sent. Please set RESEND_API_KEY in Vercel environment variables.');
+} else {
+  resend = new Resend(process.env.RESEND_API_KEY);
 }
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 module.exports = async (req, res) => {
   // Enable CORS
@@ -232,54 +234,68 @@ module.exports = async (req, res) => {
     // Send both emails
     const fromEmail = 'onboarding@resend.dev';
     
-    console.log('Attempting to send emails...');
-    console.log('From:', fromEmail);
-    console.log('To therapist:', THERAPIST_EMAIL);
-    console.log('To user:', email);
+    let therapistResult = { error: null, data: null };
+    let userResult = { error: null, data: null };
     
-    // Send notification to therapist (this will always work)
-    const therapistResult = await resend.emails.send({
-      from: fromEmail,
-      to: THERAPIST_EMAIL,
-      subject: `Uus konsultatsioonitaotlus ${firstName} ${lastName}-lt`,
-      html: therapistEmailHtml,
-    });
-
-    // Try to send confirmation to user
-    let userResult;
-    try {
-      userResult = await resend.emails.send({
-        from: fromEmail,
-        to: email,
-        subject: 'Täname teie konsultatsioonitaotluse eest',
-        html: userEmailHtml,
-      });
+    // Check if Resend is configured
+    if (!resend) {
+      console.error('RESEND_API_KEY not configured - emails will not be sent');
+      console.error('Please set RESEND_API_KEY in Vercel Dashboard → Settings → Environment Variables');
+    } else {
+      console.log('Attempting to send emails...');
+      console.log('From:', fromEmail);
+      console.log('To therapist:', THERAPIST_EMAIL);
+      console.log('To user:', email);
       
-      if (userResult.error) {
-        console.warn('Could not send to user email (domain verification needed):', userResult.error.message);
-        userResult = { data: null, error: null };
+      try {
+        // Send notification to therapist
+        therapistResult = await resend.emails.send({
+          from: fromEmail,
+          to: THERAPIST_EMAIL,
+          subject: `Uus konsultatsioonitaotlus ${firstName} ${lastName}-lt`,
+          html: therapistEmailHtml,
+        });
+        
+        if (therapistResult.error) {
+          console.error('Therapist email error:', JSON.stringify(therapistResult.error, null, 2));
+        } else {
+          console.log('Therapist email sent successfully:', therapistResult.data?.id);
+        }
+      } catch (err) {
+        console.error('Error sending therapist email:', err);
+        therapistResult = { error: { message: err.message }, data: null };
       }
-    } catch (err) {
-      console.warn('Error sending to user email:', err.message);
-      userResult = { data: null, error: null };
+
+      // Try to send confirmation to user
+      try {
+        userResult = await resend.emails.send({
+          from: fromEmail,
+          to: email,
+          subject: 'Täname teie konsultatsioonitaotluse eest',
+          html: userEmailHtml,
+        });
+        
+        if (userResult.error) {
+          console.warn('User email error:', JSON.stringify(userResult.error, null, 2));
+          console.warn('Note: In test mode, Resend only sends to verified emails. Verify your domain at https://resend.com/domains');
+        } else {
+          console.log('User email sent successfully:', userResult.data?.id);
+        }
+      } catch (err) {
+        console.error('Error sending user email:', err);
+        userResult = { error: { message: err.message }, data: null };
+      }
     }
 
-    // Check if therapist notification was sent successfully
-    if (therapistResult.error) {
-      const errorDetails = therapistResult.error;
-      console.error('Email sending error:', JSON.stringify(errorDetails, null, 2));
-      return res.status(500).json({ 
-        error: 'Teavituse e-posti saatmine ebaõnnestus',
-        message: errorDetails?.message || 'Teavituse e-posti saatmisel tekkis viga. Palun proovige hiljem uuesti.',
-        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
-      });
-    }
-
-    // If user email failed, log it but don't fail the request
-    if (userResult?.error) {
-      console.warn('User confirmation email could not be sent:', userResult.error.message);
-      console.warn('To send emails to clients, verify your domain at https://resend.com/domains');
-    }
+    // Log email status (but don't fail the booking if emails fail)
+    const emailStatus = {
+      therapistSent: !therapistResult.error && therapistResult.data,
+      userSent: !userResult.error && userResult.data,
+      therapistError: therapistResult.error?.message,
+      userError: userResult.error?.message
+    };
+    
+    console.log('Email sending status:', JSON.stringify(emailStatus, null, 2));
 
     // Store the booking
     const bookingData = {
@@ -308,12 +324,28 @@ module.exports = async (req, res) => {
     });
     await storage.set(bookingsKey, existingBookings);
 
-    // Success response
-    res.status(200).json({ 
+    // Success response (include email status for debugging)
+    const response = { 
       success: true,
-      message: 'Broneering on edukalt kinnitatud! Kontrollige oma e-posti kinnituse jaoks.',
+      message: 'Broneering on edukalt kinnitatud!',
       bookingId: cancellationToken
-    });
+    };
+    
+    // Add email status if there were issues
+    if (!emailStatus.therapistSent || !emailStatus.userSent) {
+      response.emailWarning = true;
+      if (!resend) {
+        response.message += ' Märkus: E-kirju ei saadetud, kuna RESEND_API_KEY pole seadistatud.';
+      } else if (!emailStatus.therapistSent) {
+        response.message += ' Märkus: Terapeudile e-kiri ei saadetud.';
+      } else if (!emailStatus.userSent) {
+        response.message += ' Märkus: Klientidele e-kirjade saatmiseks kinnitage oma domeen Resend-is.';
+      }
+    } else {
+      response.message += ' Kontrollige oma e-posti kinnituse jaoks.';
+    }
+    
+    res.status(200).json(response);
 
   } catch (error) {
     console.error('Server error:', error);
