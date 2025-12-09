@@ -187,8 +187,8 @@ export function BookingConfirmationPage() {
             <Home className="w-5 h-5" />
             Tagasi avalehele
           </button>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
